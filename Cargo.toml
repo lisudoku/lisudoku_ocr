@@ -1,0 +1,21 @@
+[package]
+name = "lisudoku-ocr"
+version = "0.1.0"
+edition = "2021"
+authors = ["George Marcus <george.marcus922@gmail.com>"]
+license-file = "LICENSE"
+repository = "https://github.com/lisudoku/lisudoku_ocr"
+description = "Detecting sudoku grids from images."
+
+[dependencies]
+warp = "0.3.1"
+opencv = { version = "=0.92.2", features = ["clang-runtime"] }
+reqwest = "0.11.14"
+medians = "2.2.1"
+tesseract-sys = "=0.5.15"
+tesseract-plumbing = "=0.9.0"
+byte-unit = "4.0.18"
+itertools = "0.10.5"
+lisudoku-solver = "=0.1.19"
+serde_json = "1.0.61"
+serde = "1.0.209"
