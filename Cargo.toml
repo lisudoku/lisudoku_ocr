@@ -1,11 +1,18 @@
 [package]
 name = "lisudoku-ocr"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["George Marcus <george.marcus922@gmail.com>"]
 license-file = "LICENSE"
 repository = "https://github.com/lisudoku/lisudoku_ocr"
 description = "Detecting sudoku grids from images."
+
+[lib]
+crate-type = ["lib"]
+
+[[bin]]
+name = "lisudoku_ocr"
+path = "src/main.rs"
 
 [dependencies]
 warp = "0.3.1"

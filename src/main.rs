@@ -1,16 +1,9 @@
 use std::process;
 use lisudoku_solver::types::SudokuConstraints;
-use sudoku_image_parser::{parse_image_from_bytes, CellCandidates, OcrResult};
+use lisudoku_ocr::{parse_image_at_path, parse_image_from_bytes, CellCandidates, OcrResult};
 use serde::{Deserialize, Serialize};
 use warp::hyper::body::Bytes;
 use url::Url;
-
-use crate::sudoku_image_parser::parse_image_at_path;
-
-mod sudoku_image_parser;
-mod tesseract;
-mod line_detection;
-
 
 #[derive(Serialize, Deserialize)]
 struct OcrResultJson {
