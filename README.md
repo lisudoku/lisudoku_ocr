@@ -15,9 +15,19 @@ You must have `opencv` installed. Follow the steps at https://github.com/twisted
 
 Download https://github.com/Shreeshrii/tessdata_shreetest/raw/master/digits.traineddata to `/usr/local/share/tessdata/`.
 
-## Running on a local image
+## Running
 
-`cargo run IMAGE_PATH=src/test_images/image9.png`
+Local image file
+
+`cargo run src/test_images/image9.png`
+
+External image URL
+
+`cargo run https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Sudoku_Puzzle_by_L2G-20050714_standardized_layout.svg/1200px-Sudoku_Puzzle_by_L2G-20050714_standardized_layout.svg.png`
+
+Running `cargo install lisudoku-ocr` will globally install the `lisudoku-ocr` binary so you can run
+
+`lisudoku-ocr any/file/path.png`
 
 ## Contribute
 

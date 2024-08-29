@@ -57,6 +57,8 @@ pub fn parse_image_from_bytes(image_data: &Bytes) -> Result<OcrResult, Box<dyn s
 }
 
 pub fn parse_image_from_object_full(image: &Mat) -> Result<OcrResult, Box<dyn std::error::Error>> {
+  eprintln!("Running OCR");
+
   let res = parse_image_from_object(image, false);
 
   if let Err(e) = res {
