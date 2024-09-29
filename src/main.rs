@@ -11,7 +11,7 @@ struct OcrResultJson {
   candidates: Vec<CellCandidates>,
 }
 
-pub async fn get_external_image_data(image_url: &str) -> Result<Bytes, Box<dyn std::error::Error>> {
+async fn get_external_image_data(image_url: &str) -> Result<Bytes, Box<dyn std::error::Error>> {
   eprintln!("Fetching image data at {}", image_url);
 
   let image_data = reqwest::get(image_url)
