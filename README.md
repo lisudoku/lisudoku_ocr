@@ -2,6 +2,8 @@
 
 This is a library for detecting sudoku grids from images.
 
+https://crates.io/crates/lisudoku-ocr
+
 ## Features
 
 * Detects classic sudoku digits and pencilmarks.
