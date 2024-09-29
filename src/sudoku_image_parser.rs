@@ -17,6 +17,7 @@ use warp::hyper::body::Bytes;
 use crate::line_detection::{detect_lines_full, Line};
 use crate::tesseract::Tesseract;
 use serde::{Deserialize, Serialize};
+use tempfile::Builder;
 
 #[cfg(test)]
 use lisudoku_solver::types::SudokuGrid;
@@ -426,9 +427,19 @@ fn detect_digit_in_square(square: &Mat, big_digit: bool, cell_candidate_options:
   let char_whitelist = &cell_candidate_options.iter().join("");
   let mut tess = Tesseract::new(char_whitelist)?;
 
-  save_to_file(&normalized_square, "square.png");
+  // Creating temporary file to store the small square image.
+  // Will be automatically deleted once we are out of scope.
+  let temp_file = Builder::new().prefix("square_").suffix(".png").tempfile()?;
 
-  tess = tess.set_image("square.png")?;
+  let tmp_file_path = temp_file.path().display().to_string();
+
+  if DEBUG {
+    println!("Created temp file {}", &tmp_file_path);
+  }
+
+  save_to_file(&normalized_square, &tmp_file_path);
+
+  tess = tess.set_image(&tmp_file_path)?;
 
   let mut text = tess.get_text()?;
 

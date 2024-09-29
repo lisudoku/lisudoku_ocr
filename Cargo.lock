@@ -678,6 +678,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "tempfile",
  "tesseract-plumbing",
  "tesseract-sys",
  "tokio",
