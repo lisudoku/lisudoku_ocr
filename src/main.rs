@@ -15,7 +15,7 @@ async fn main() {
 
   eprintln!("Parsing image at {}", image_url);
 
-  let ocr_result = parse_image_at_url(&image_url).await.expect("Unable to parse sudoku grid from image");
+  let ocr_result = parse_image_at_url(&image_url, true).await.expect("Unable to parse sudoku grid from image");
 
   let ocr_result_json = json!({
     "grid": SudokuConstraints::new(9, ocr_result.given_digits).to_import_string(),

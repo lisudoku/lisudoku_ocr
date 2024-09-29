@@ -57,46 +57,46 @@ async fn get_external_image_data(image_url: &str) -> Result<Bytes, Box<dyn std::
   Ok(image_data)
 }
 
-pub async fn parse_image_at_url(image_url: &str) -> Result<OcrResult, Box<dyn std::error::Error>> {
+pub async fn parse_image_at_url(image_url: &str, only_given_digits: bool) -> Result<OcrResult, Box<dyn std::error::Error>> {
   if Url::parse(&image_url).is_ok() {
     eprintln!("Detected parameter as external URL");
     let image_data = get_external_image_data(&image_url).await?;
-    let ocr_result = parse_image_from_bytes(&image_data)?;
+    let ocr_result = parse_image_from_bytes(&image_data, only_given_digits)?;
     return Ok(ocr_result);
   }
 
   eprintln!("Detected parameter as local file path");
-  let ocr_result = parse_image_at_local_path(image_url)?;
+  let ocr_result = parse_image_at_local_path(image_url, only_given_digits)?;
   Ok(ocr_result)
 }
 
-fn parse_image_at_local_path(image_path: &str) -> Result<OcrResult, Box<dyn std::error::Error>> {
+fn parse_image_at_local_path(image_path: &str, only_given_digits: bool) -> Result<OcrResult, Box<dyn std::error::Error>> {
   let image = imgcodecs::imread(image_path, imgcodecs::IMREAD_COLOR)?;
-  parse_image_from_object_full(&image)
+  parse_image_from_object_full(&image, only_given_digits)
 }
 
-pub fn parse_image_from_bytes(image_data: &Bytes) -> Result<OcrResult, Box<dyn std::error::Error>> {
+pub fn parse_image_from_bytes(image_data: &Bytes, only_given_digits: bool) -> Result<OcrResult, Box<dyn std::error::Error>> {
   let image_vec = Vector::<u8>::from_iter(image_data.clone());
   let image = imgcodecs::imdecode(&image_vec, imgcodecs::IMREAD_COLOR)?;
 
-  parse_image_from_object_full(&image)
+  parse_image_from_object_full(&image, only_given_digits)
 }
 
-pub fn parse_image_from_object_full(image: &Mat) -> Result<OcrResult, Box<dyn std::error::Error>> {
+pub fn parse_image_from_object_full(image: &Mat, only_given_digits: bool) -> Result<OcrResult, Box<dyn std::error::Error>> {
   eprintln!("Running OCR");
 
-  let res = parse_image_from_object(image, false);
+  let res = parse_image_from_object(image, false, only_given_digits);
 
   if let Err(e) = res {
     eprintln!("Error parse_image_from_object: {}", e);
     eprintln!("Retrying with use_bw=true");
-    parse_image_from_object(image, true)
+    parse_image_from_object(image, true, only_given_digits)
   } else {
     res
   }
 }
 
-pub fn parse_image_from_object(image: &Mat, use_bw: bool) -> Result<OcrResult, Box<dyn std::error::Error>> {
+pub fn parse_image_from_object(image: &Mat, use_bw: bool, only_given_digits: bool) -> Result<OcrResult, Box<dyn std::error::Error>> {
   // Crop image to fix phone screenshots
   let cropped_image = crop_image(image)?;
 
@@ -125,7 +125,11 @@ pub fn parse_image_from_object(image: &Mat, use_bw: bool) -> Result<OcrResult, B
 
   let grid_candidate_options = compute_candidate_options(&given_digits);
 
-  let candidates = parse_candidates(&gray_image, &horizontal_lines, &vertical_lines, &grid_candidate_options)?;
+  let candidates = if only_given_digits {
+    vec![]
+  } else {
+    parse_candidates(&gray_image, &horizontal_lines, &vertical_lines, &grid_candidate_options)?
+  };
 
   let result = OcrResult {
     given_digits,
@@ -548,7 +552,7 @@ fn compare_candidates(actual_candidates: Vec<CellCandidates>, expected_candidate
 #[test]
 fn check_parse_image1() {
   let image = imgcodecs::imread("src/test_images/image1.png", imgcodecs::IMREAD_COLOR).unwrap();
-  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image).unwrap();
+  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image, false).unwrap();
 
   let expected_grid = vec![
     vec![ 0, 1, 6, 4, 2, 0, 9, 7, 8 ],
@@ -605,9 +609,32 @@ fn check_parse_image1() {
 }
 
 #[test]
+fn check_parse_image1_only_given_digits() {
+  let image = imgcodecs::imread("src/test_images/image1.png", imgcodecs::IMREAD_COLOR).unwrap();
+  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image, true).unwrap();
+
+  let expected_grid = vec![
+    vec![ 0, 1, 6, 4, 2, 0, 9, 7, 8 ],
+    vec![ 7, 0, 0, 8, 0, 0, 0, 4, 0 ],
+    vec![ 9, 0, 0, 7, 0, 0, 0, 5, 0 ],
+    vec![ 6, 0, 0, 5, 0, 2, 1, 8, 3 ],
+    vec![ 0, 0, 2, 0, 0, 7, 4, 6, 5 ],
+    vec![ 0, 0, 1, 6, 0, 0, 2, 9, 7 ],
+    vec![ 0, 3, 0, 2, 5, 6, 7, 1, 9 ],
+    vec![ 2, 6, 0, 0, 0, 0, 5, 3, 4 ],
+    vec![ 1, 0, 0, 3, 0, 0, 8, 2, 6 ],
+  ];
+  let expected_given_digits = SudokuGrid::new(expected_grid).to_fixed_numbers();
+  compare_fixed_numbers(given_digits, expected_given_digits);
+
+  let expected_candidates = vec![];
+  compare_candidates(candidates, expected_candidates);
+}
+
+#[test]
 fn check_parse_image2() {
   let image = imgcodecs::imread("src/test_images/image2.png", imgcodecs::IMREAD_COLOR).unwrap();
-  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image).unwrap();
+  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image, false).unwrap();
 
   let expected_grid = vec![
     vec![ 6, 8, 5, 2, 7, 1, 9, 3, 4 ],
@@ -666,7 +693,7 @@ fn check_parse_image2() {
 #[test]
 fn check_parse_image3() {
   let image = imgcodecs::imread("src/test_images/image3.jpg.webp", imgcodecs::IMREAD_COLOR).unwrap();
-  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image).unwrap();
+  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image, false).unwrap();
 
   let expected_grid = vec![
     vec![ 0, 7, 8, 5, 0, 0, 0, 0, 0 ],
@@ -744,7 +771,7 @@ fn check_parse_image3() {
 #[test]
 fn check_parse_image4() {
   let image = imgcodecs::imread("src/test_images/image4.jpg", imgcodecs::IMREAD_COLOR).unwrap();
-  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image).unwrap();
+  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image, false).unwrap();
 
   let expected_grid = vec![
     vec![ 0, 2, 4, 0, 0, 0, 0, 0, 0 ],
@@ -808,7 +835,7 @@ fn check_parse_image4() {
 #[test]
 fn check_parse_image5() {
   let image = imgcodecs::imread("src/test_images/image5.webp", imgcodecs::IMREAD_COLOR).unwrap();
-  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image).unwrap();
+  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image, false).unwrap();
   let expected_grid = vec![
     vec![ 0, 0, 4, 3, 8, 9, 0, 7, 6 ],
     vec![ 0, 0, 0, 4, 0, 0, 0, 3, 0 ],
@@ -869,7 +896,7 @@ fn check_parse_image5() {
 #[test]
 fn check_parse_image6() {
   let image = imgcodecs::imread("src/test_images/image6.png", imgcodecs::IMREAD_COLOR).unwrap();
-  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image).unwrap();
+  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image, false).unwrap();
 
   let expected_grid = vec![
     vec![ 4, 6, 0, 9, 0, 1, 3, 8, 2 ],
@@ -922,7 +949,7 @@ fn check_parse_image6() {
 #[test]
 fn check_parse_image7() {
   let image = imgcodecs::imread("src/test_images/image7.jpg", imgcodecs::IMREAD_COLOR).unwrap();
-  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image).unwrap();
+  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image, false).unwrap();
   let expected_grid = vec![
     vec![ 5, 1, 0, 7, 0, 0, 3, 0, 2 ],
     vec![ 9, 0, 0, 0, 0, 0, 6, 0, 0 ],
@@ -976,7 +1003,7 @@ fn check_parse_image7() {
 #[test]
 fn check_parse_image8() {
   let image = imgcodecs::imread("src/test_images/image8.jpg", imgcodecs::IMREAD_COLOR).unwrap();
-  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image).unwrap();
+  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image, false).unwrap();
   let expected_grid = vec![
     vec![ 0, 0, 0, 0, 0, 5, 0, 0, 6 ],
     vec![ 5, 0, 6, 0, 0, 8, 0, 0, 9 ],
@@ -1040,7 +1067,7 @@ fn check_parse_image8() {
 #[test]
 fn check_parse_image9() {
   let image = imgcodecs::imread("src/test_images/image9.png", imgcodecs::IMREAD_COLOR).unwrap();
-  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image).unwrap();
+  let OcrResult { given_digits, candidates } = parse_image_from_object_full(&image, false).unwrap();
   let expected_grid = vec![
     vec![ 4, 7, 3, 6, 5, 2, 0, 9, 0 ],
     vec![ 0, 5, 0, 9, 4, 3, 7, 2, 6 ],
