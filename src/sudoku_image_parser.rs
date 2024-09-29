@@ -13,6 +13,7 @@ use opencv::imgproc::{
   canny, cvt_color, gaussian_blur, threshold, find_contours, bounding_rect,
   THRESH_BINARY, THRESH_BINARY_INV, THRESH_OTSU, COLOR_BGR2GRAY, RETR_TREE, CHAIN_APPROX_SIMPLE, COLOR_GRAY2BGR,
 };
+use url::Url;
 use warp::hyper::body::Bytes;
 use crate::line_detection::{detect_lines_full, Line};
 use crate::tesseract::Tesseract;
@@ -45,7 +46,31 @@ pub struct OcrResult {
   pub candidates:Vec<CellCandidates>,
 }
 
-pub fn parse_image_at_path(image_path: &str) -> Result<OcrResult, Box<dyn std::error::Error>> {
+async fn get_external_image_data(image_url: &str) -> Result<Bytes, Box<dyn std::error::Error>> {
+  eprintln!("Fetching image data at {}", image_url);
+
+  let image_data = reqwest::get(image_url)
+    .await?
+    .bytes()
+    .await?;
+
+  Ok(image_data)
+}
+
+pub async fn parse_image_at_url(image_url: &str) -> Result<OcrResult, Box<dyn std::error::Error>> {
+  if Url::parse(&image_url).is_ok() {
+    eprintln!("Detected parameter as external URL");
+    let image_data = get_external_image_data(&image_url).await?;
+    let ocr_result = parse_image_from_bytes(&image_data)?;
+    return Ok(ocr_result);
+  }
+
+  eprintln!("Detected parameter as local file path");
+  let ocr_result = parse_image_at_local_path(image_url)?;
+  Ok(ocr_result)
+}
+
+fn parse_image_at_local_path(image_path: &str) -> Result<OcrResult, Box<dyn std::error::Error>> {
   let image = imgcodecs::imread(image_path, imgcodecs::IMREAD_COLOR)?;
   parse_image_from_object_full(&image)
 }
