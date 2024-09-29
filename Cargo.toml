@@ -17,7 +17,7 @@ path = "src/main.rs"
 [dependencies]
 warp = "0.3.1"
 opencv = { version = "=0.92.2", features = ["clang-runtime"] }
-reqwest = "=0.11.14"
+reqwest = "0.11.14"
 medians = "2.2.1"
 tesseract-sys = "=0.5.15"
 tesseract-plumbing = "=0.9.0"
