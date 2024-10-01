@@ -49,8 +49,12 @@ pub struct OcrResult {
 async fn get_external_image_data(image_url: &str) -> Result<Bytes, Box<dyn std::error::Error>> {
   eprintln!("Fetching image data at {}", image_url);
 
-  let image_data = reqwest::get(image_url)
-    .await?
+  let response = match reqwest::get(image_url).await {
+    Ok(res) => res,
+    Err(_) => return Err(Box::from(format!("Could not load image at url {}", image_url))),
+  };
+
+  let image_data = response
     .bytes()
     .await?;
 
@@ -72,6 +76,9 @@ pub async fn parse_image_at_url(image_url: &str, only_given_digits: bool) -> Res
 
 fn parse_image_at_local_path(image_path: &str, only_given_digits: bool) -> Result<OcrResult, Box<dyn std::error::Error>> {
   let image = imgcodecs::imread(image_path, imgcodecs::IMREAD_COLOR)?;
+  if image.total() == 0 {
+    return Err(Box::from(format!("Could not load image at path {}", image_path)));
+  }
   parse_image_from_object_full(&image, only_given_digits)
 }
 
