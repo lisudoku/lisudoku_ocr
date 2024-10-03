@@ -74,6 +74,10 @@ fn detect_horizontal_lines(lines: &Vec<Line>, image_width: i32, filter_by_size: 
     .collect();
   eprintln!("Horizontal count (initial) = {}", horizontal.len());
 
+  if horizontal.is_empty() {
+    return Ok(vec![])
+  }
+
   horizontal.sort_by_key(|line| line.1);
   let mut horizontal: Vec<Line> = horizontal.iter().copied().enumerate().filter_map(|(index, &line)| {
     if index == 0 || line.1 - horizontal[index - 1].1 > 10 {
@@ -122,6 +126,11 @@ fn detect_vertical_lines(lines: &Vec<Line>, filter_by_size: bool) -> Result<Vec<
     .filter(|line| (line.0 - line.2).abs() < (line.1 - line.3).abs())
     .collect();
   eprintln!("Vertical count (initial) = {}", vertical.len());
+
+  if vertical.is_empty() {
+    return Ok(vec![])
+  }
+
   vertical.sort_by_key(|line| line.0);
   let mut vertical: Vec<Line> = vertical.iter().copied().enumerate().filter_map(|(index, &line)| {
     if index == 0 || line.0 - vertical[index - 1].0 > 10 {

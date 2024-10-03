@@ -98,15 +98,18 @@ pub fn parse_image_from_object_full(image: &Mat, only_given_digits: bool) -> Res
 
   eprintln!("Running OCR");
 
-  let res = parse_image_from_object(image, false, only_given_digits);
+  let mut res = parse_image_from_object(image, false, only_given_digits);
 
   if let Err(e) = res {
     eprintln!("Error parse_image_from_object: {}", e);
     eprintln!("Retrying with use_bw=true");
-    parse_image_from_object(image, true, only_given_digits)
-  } else {
-    res
+    res = parse_image_from_object(image, true, only_given_digits)
   }
+  if let Err(e) = res {
+    eprintln!("Error parse_image_from_object (#2): {}", e);
+    return Err(Box::from("No sudoku grid detected"))
+  }
+  res
 }
 
 pub fn parse_image_from_object(image: &Mat, use_bw: bool, only_given_digits: bool) -> Result<OcrResult, Box<dyn std::error::Error>> {
