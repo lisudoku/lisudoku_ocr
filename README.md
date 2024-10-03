@@ -46,4 +46,4 @@ Join the [discord server](https://discord.gg/SGV8TQVSeT).
 
 ## Running tests
 
-`RUST_TEST_THREADS=1 cargo test`
+`cargo test`
