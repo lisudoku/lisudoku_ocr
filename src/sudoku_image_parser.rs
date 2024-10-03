@@ -54,6 +54,8 @@ async fn get_external_image_data(image_url: &str) -> Result<Bytes, Box<dyn std::
     Err(_) => return Err(Box::from(format!("Could not load image at url {}", image_url))),
   };
 
+  // TODO: Find a way to validate response that it's an image
+
   let image_data = response
     .bytes()
     .await?;
@@ -77,7 +79,7 @@ pub async fn parse_image_at_url(image_url: &str, only_given_digits: bool) -> Res
 fn parse_image_at_local_path(image_path: &str, only_given_digits: bool) -> Result<OcrResult, Box<dyn std::error::Error>> {
   let image = imgcodecs::imread(image_path, imgcodecs::IMREAD_COLOR)?;
   if image.total() == 0 {
-    return Err(Box::from(format!("Could not load image at path {}", image_path)));
+    return Err(Box::from(format!("Could not load image at path {}", image_path)))
   }
   parse_image_from_object_full(&image, only_given_digits)
 }
@@ -90,6 +92,10 @@ pub fn parse_image_from_bytes(image_data: &Bytes, only_given_digits: bool) -> Re
 }
 
 pub fn parse_image_from_object_full(image: &Mat, only_given_digits: bool) -> Result<OcrResult, Box<dyn std::error::Error>> {
+  if image.total() == 0 {
+    return Err(Box::from("Could not load image content"))
+  }
+
   eprintln!("Running OCR");
 
   let res = parse_image_from_object(image, false, only_given_digits);
