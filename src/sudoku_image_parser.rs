@@ -13,19 +13,21 @@ use opencv::imgproc::{
   canny, cvt_color, gaussian_blur, threshold, find_contours, bounding_rect,
   THRESH_BINARY, THRESH_BINARY_INV, THRESH_OTSU, COLOR_BGR2GRAY, RETR_TREE, CHAIN_APPROX_SIMPLE, COLOR_GRAY2BGR,
 };
+use reqwest::StatusCode;
 use url::Url;
 use warp::hyper::body::Bytes;
 use crate::line_detection::{detect_lines_full, Line};
 use crate::tesseract::Tesseract;
 use serde::{Deserialize, Serialize};
 use tempfile::Builder;
+use thiserror::Error;
 
 #[cfg(test)]
 use lisudoku_solver::types::SudokuGrid;
 
 const DEBUG: bool = false;
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CellCandidates {
   pub cell: CellPosition,
   pub values: Vec<u32>,
@@ -41,29 +43,45 @@ impl CellCandidates {
   }
 }
 
+#[derive(Clone)]
 pub struct OcrResult {
   pub given_digits: Vec<FixedNumber>,
-  pub candidates:Vec<CellCandidates>,
+  pub candidates: Vec<CellCandidates>,
 }
 
-async fn get_external_image_data(image_url: &str) -> Result<Bytes, Box<dyn std::error::Error>> {
+#[derive(Debug, Error)]
+pub enum ParseImageError {
+  #[error("Could not fetch image: {0}")]
+  ImageRequest(String),
+
+  #[error("Invalid image: {0}")]
+  ImageInvalid(String),
+
+  #[error("No sudoku grid detected in image")]
+  NoGrid,
+}
+
+pub async fn get_external_image_data(image_url: &str) -> Result<Bytes, ParseImageError> {
   eprintln!("Fetching image data at {}", image_url);
 
-  let response = match reqwest::get(image_url).await {
-    Ok(res) => res,
-    Err(_) => return Err(Box::from(format!("Could not load image at url {}", image_url))),
-  };
+  let response = reqwest::get(image_url).await.map_err(|e| {
+    ParseImageError::ImageRequest(e.to_string())
+  })?;
 
   // TODO: Find a way to validate response that it's an image
 
-  let image_data = response
-    .bytes()
-    .await?;
+  if response.status() != StatusCode::OK {
+    return Err(ParseImageError::ImageRequest(format!("Image url returned status {}", response.status())))
+  }
+
+  let image_data = response.bytes().await.map_err(|e| {
+    ParseImageError::ImageRequest(e.to_string())
+  })?;
 
   Ok(image_data)
 }
 
-pub async fn parse_image_at_url(image_url: &str, only_given_digits: bool) -> Result<OcrResult, Box<dyn std::error::Error>> {
+pub async fn parse_image_at_url(image_url: &str, only_given_digits: bool) -> Result<OcrResult, ParseImageError> {
   if Url::parse(&image_url).is_ok() {
     eprintln!("Detected parameter as external URL");
     let image_data = get_external_image_data(&image_url).await?;
@@ -76,24 +94,24 @@ pub async fn parse_image_at_url(image_url: &str, only_given_digits: bool) -> Res
   Ok(ocr_result)
 }
 
-fn parse_image_at_local_path(image_path: &str, only_given_digits: bool) -> Result<OcrResult, Box<dyn std::error::Error>> {
-  let image = imgcodecs::imread(image_path, imgcodecs::IMREAD_COLOR)?;
+fn parse_image_at_local_path(image_path: &str, only_given_digits: bool) -> Result<OcrResult, ParseImageError> {
+  let image = imgcodecs::imread(image_path, imgcodecs::IMREAD_COLOR).unwrap();
   if image.total() == 0 {
-    return Err(Box::from(format!("Could not load image at path {}", image_path)))
+    return Err(ParseImageError::ImageInvalid(format!("tried local path {}", image_path)))
   }
   parse_image_from_object_full(&image, only_given_digits)
 }
 
-pub fn parse_image_from_bytes(image_data: &Bytes, only_given_digits: bool) -> Result<OcrResult, Box<dyn std::error::Error>> {
+pub fn parse_image_from_bytes(image_data: &Bytes, only_given_digits: bool) -> Result<OcrResult, ParseImageError> {
   let image_vec = Vector::<u8>::from_iter(image_data.clone());
-  let image = imgcodecs::imdecode(&image_vec, imgcodecs::IMREAD_COLOR)?;
+  let image = imgcodecs::imdecode(&image_vec, imgcodecs::IMREAD_COLOR).map_err(|_| { ParseImageError::ImageInvalid("Invalid image content".to_string()) })?;
 
   parse_image_from_object_full(&image, only_given_digits)
 }
 
-pub fn parse_image_from_object_full(image: &Mat, only_given_digits: bool) -> Result<OcrResult, Box<dyn std::error::Error>> {
+pub fn parse_image_from_object_full(image: &Mat, only_given_digits: bool) -> Result<OcrResult, ParseImageError> {
   if image.total() == 0 {
-    return Err(Box::from("Could not load image content"))
+    return Err(ParseImageError::ImageInvalid("No image content".to_string()))
   }
 
   eprintln!("Running OCR");
@@ -107,9 +125,9 @@ pub fn parse_image_from_object_full(image: &Mat, only_given_digits: bool) -> Res
   }
   if let Err(e) = res {
     eprintln!("Error parse_image_from_object (#2): {}", e);
-    return Err(Box::from("No sudoku grid detected"))
+    return Err(ParseImageError::NoGrid)
   }
-  res
+  Ok(res.unwrap())
 }
 
 pub fn parse_image_from_object(image: &Mat, use_bw: bool, only_given_digits: bool) -> Result<OcrResult, Box<dyn std::error::Error>> {
